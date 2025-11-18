@@ -33,7 +33,8 @@ import com.google.accompanist.permissions.rememberPermissionState
 @Composable
 fun PassiveDataApp(
     healthServicesRepository: HealthServicesRepository,
-    passiveDataRepository: PassiveDataRepository
+    passiveDataRepository: PassiveDataRepository,
+    audioRecorder: AudioRecorder
 ) {
     PassiveDataTheme {
         AppScaffold(
@@ -42,11 +43,13 @@ fun PassiveDataApp(
             val viewModel: PassiveDataViewModel = viewModel(
                 factory = PassiveDataViewModelFactory(
                     healthServicesRepository = healthServicesRepository,
-                    passiveDataRepository = passiveDataRepository
+                    passiveDataRepository = passiveDataRepository,
+                    audioRecorder = audioRecorder
                 )
             )
             val hrValue by viewModel.hrValue.collectAsState()
             val hrEnabled by viewModel.hrEnabled.collectAsState()
+            val isRecording by viewModel.isRecording.collectAsState()
             val uiState by viewModel.uiState
 
             if (uiState == UiState.Supported) {
@@ -60,7 +63,10 @@ fun PassiveDataApp(
                     hrValue = hrValue,
                     hrEnabled = hrEnabled,
                     onEnableClick = { viewModel.toggleEnabled() },
-                    permissionState = permissionState
+                    permissionState = permissionState,
+                    isRecording = isRecording,
+                    onStartRecording = viewModel::startRecording,
+                    onStopRecording = viewModel::stopRecording
                 )
             } else if (uiState == UiState.NotSupported) {
                 NotSupportedScreen()

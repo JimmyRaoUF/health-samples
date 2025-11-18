@@ -18,6 +18,7 @@ package com.example.passivedatacompose
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import com.example.passivedatacompose.presentation.AudioRecorder
 import com.example.passivedatacompose.presentation.PassiveDataApp
 
 class MainActivity : ComponentActivity() {
@@ -26,11 +27,13 @@ class MainActivity : ComponentActivity() {
 
         val healthServicesRepository = (application as MainApplication).healthServicesRepository
         val passiveDataRepository = (application as MainApplication).passiveDataRepository
+        val audioRecorder = AudioRecorder(this)
 
         setContent {
             PassiveDataApp(
                 healthServicesRepository = healthServicesRepository,
-                passiveDataRepository = passiveDataRepository
+                passiveDataRepository = passiveDataRepository,
+                audioRecorder = audioRecorder
             )
         }
     }

@@ -15,6 +15,9 @@
  */
 package com.example.passivedatacompose.presentation
 
+import android.content.Context
+import android.media.MediaRecorder
+import android.os.Build
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -22,14 +25,60 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.passivedatacompose.data.HealthServicesRepository
 import com.example.passivedatacompose.data.PassiveDataRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class AudioRecorder(private val context: Context) {
+    private var mediaRecorder: MediaRecorder? = null
+
+    fun start() {
+        val timestamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.US).format(Date())
+        val file = File(context.filesDir, "Manual-$timestamp.m4a")
+
+        mediaRecorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            MediaRecorder(context)
+        } else {
+            @Suppress("DEPRECATION")
+            MediaRecorder()
+        }.apply {
+            setAudioSource(MediaRecorder.AudioSource.MIC)
+            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            setOutputFile(file.absolutePath)
+            try {
+                prepare()
+                start()
+            } catch (e: Exception) {
+                // Handle exceptions
+            }
+        }
+    }
+
+    fun stop() {
+        mediaRecorder?.apply {
+            try {
+                stop()
+                release()
+            } catch (e: Exception) {
+                // Handle exceptions
+            }
+        }
+        mediaRecorder = null
+    }
+}
 
 class PassiveDataViewModel(
     private val healthServicesRepository: HealthServicesRepository,
-    private val passiveDataRepository: PassiveDataRepository
+    private val passiveDataRepository: PassiveDataRepository,
+    private val audioRecorder: AudioRecorder
 ) : ViewModel() {
     // Provides a hot flow of the latest HR value read from Data Store whilst there is an active
     // UI subscription. HR values are written to the Data Store in the [PassiveDataService] each
@@ -41,6 +90,10 @@ class PassiveDataViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(), false)
 
     val uiState: MutableState<UiState> = mutableStateOf(UiState.Startup)
+
+    // New state for manual recording
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording = _isRecording.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -73,18 +126,34 @@ class PassiveDataViewModel(
             }
         }
     }
+
+    fun startRecording() {
+        viewModelScope.launch {
+            _isRecording.value = true
+            audioRecorder.start()
+        }
+    }
+
+    fun stopRecording() {
+        viewModelScope.launch {
+            _isRecording.value = false
+            audioRecorder.stop()
+        }
+    }
 }
 
 class PassiveDataViewModelFactory(
     private val healthServicesRepository: HealthServicesRepository,
-    private val passiveDataRepository: PassiveDataRepository
+    private val passiveDataRepository: PassiveDataRepository,
+    private val audioRecorder: AudioRecorder
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(PassiveDataViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             return PassiveDataViewModel(
                 healthServicesRepository = healthServicesRepository,
-                passiveDataRepository = passiveDataRepository
+                passiveDataRepository = passiveDataRepository,
+                audioRecorder = audioRecorder
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
